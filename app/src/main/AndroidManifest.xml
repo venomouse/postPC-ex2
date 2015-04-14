@@ -16,6 +16,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".AddNewTodoItemActivity"
+            android:label="@string/title_activity_add_new_todo_item"
+            android:theme="@android:style/Theme.Dialog"
+
+            android:parentActivityName=".TodoListManagerActivity" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="il.ac.huji.todolist.TodoListManagerActivity" />
+        </activity>
     </application>
 
 </manifest>
