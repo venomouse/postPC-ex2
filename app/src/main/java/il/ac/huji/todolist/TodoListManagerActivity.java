@@ -2,9 +2,13 @@ package il.ac.huji.todolist;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Color;
 import android.net.Uri;
 import android.support.v7.app.ActionBarActivity;
@@ -33,19 +37,41 @@ import java.util.HashMap;
 
 public class TodoListManagerActivity extends ActionBarActivity {
 
+
     ArrayList<TaskEntry> tasks;
     ArrayAdapter<TaskEntry> taskAdapter;
     //this variable is used to checking overdue dates
     GregorianCalendar today;
     ListView lstTodoItems;
+    TodoListDBHelper todoListDBHelper;
+
+    final String DB_NAME = "TodoList";
+    final String DB_TASK = "task";
+    final String DB_DATE = "date";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_todo_list_manager);
 
         tasks = new ArrayList<TaskEntry> ();
         today = new GregorianCalendar();
+
+        //get the database
+        todoListDBHelper = new TodoListDBHelper(this);
+        SQLiteDatabase todoListDB = todoListDBHelper.getReadableDatabase();
+
+        //fill the list
+        //didn't manage to get CursorAdapter to work :(
+        String[] columns = new String[]{DB_TASK, DB_DATE};
+        Cursor todoListCursor = todoListDB.query(DB_NAME, columns, null, null, null, null, null);
+        todoListCursor.moveToFirst();
+
+        while (!todoListCursor.isAfterLast()) {
+            tasks.add(new TaskEntry(todoListCursor.getString(0), new Date(todoListCursor.getLong(1))));
+            todoListCursor.moveToNext();
+        }
+
+        setContentView(R.layout.activity_todo_list_manager);
 
         lstTodoItems = (ListView)findViewById(R.id.lstTodoItems);
 
@@ -109,6 +135,14 @@ public class TodoListManagerActivity extends ActionBarActivity {
                                               public void onClick(View v) {
 
                                                   tasks.remove(currItem);
+
+                                                  //remove from the database
+                                                  SQLiteDatabase todoListDataBase = todoListDBHelper.getWritableDatabase();
+                                                  String selection = DB_TASK + "='"  + currItem.getTask()   +
+                                                          "' and " + DB_DATE + "='" +
+                                                          Long.toString(currItem.getDate().getTime()) + "'";
+                                                  todoListDataBase.delete(DB_NAME, selection, null);
+
                                                   taskAdapter.notifyDataSetChanged();
                                                   alertDialog.hide();
 
@@ -177,10 +211,17 @@ public class TodoListManagerActivity extends ActionBarActivity {
             if(resultCode == RESULT_OK){
                 String task =data.getStringExtra("title");
                 Date date = (Date) data.getSerializableExtra("dueDate");
-                GregorianCalendar d= new GregorianCalendar(date.getYear(), date.getMonth(), date.getDay());
 
-                TaskEntry newTask = new TaskEntry(task, date.getDay(),  date.getMonth(), date.getYear());
+                TaskEntry newTask = new TaskEntry(task, date);
                 tasks.add(newTask);
+
+                //adding to the database
+                ContentValues newDBEntry = new ContentValues();
+                newDBEntry.put(DB_TASK, task);
+                newDBEntry.put(DB_DATE, date.getTime());
+                SQLiteDatabase todoListDataBase = todoListDBHelper.getWritableDatabase();
+                todoListDataBase.insert(DB_NAME, null, newDBEntry);
+
                 taskAdapter.notifyDataSetChanged();
 
             }
@@ -205,6 +246,13 @@ public class TodoListManagerActivity extends ActionBarActivity {
             GregorianCalendar calendar = new GregorianCalendar(year, month, day);
             this.date = calendar.getTime();
             this.df = new SimpleDateFormat("dd/MM/yyyy");
+        }
+
+        TaskEntry(String task, Date date)
+        {
+            this.task = task;
+            this.date = date;
+            this.df =  new SimpleDateFormat("dd/MM/yyyy");
         }
 
         public String getTask()
